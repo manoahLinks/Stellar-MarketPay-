@@ -201,7 +201,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/webauthn",      webauthnRoutes);
 app.use("/api/disputes",      disputeRoutes);
 app.use("/api/admin",         adminRoutes);
-app.use("/api/time-entries",  timeEntryRoutes);
+app.use("/api/referrals",     referralRoutes);
 
 app.use((err, req, res, next) => {
   logError(req.logger || serviceLogger, err, {

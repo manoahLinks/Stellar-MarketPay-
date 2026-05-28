@@ -9,11 +9,6 @@ const pool = require("../db/pool");
 const { getTimezoneOffset } = require("date-fns-tz");
 const { isBlocked } = require("./profileService");
 
-const { getTimezoneOffset } = require("date-fns-tz");
-const { isBlocked } = require("./profileService");
-
-const { getTimezoneOffset } = require("date-fns-tz");
-
 /**
  * Camel-cased job record returned by this service.
  *
@@ -65,7 +60,13 @@ const { getTimezoneOffset } = require("date-fns-tz");
  * @property {string|null} nextCursor  Opaque base64 cursor for the next page, or null when exhausted.
  */
 
-const VALID_STATUSES = ["open", "in_progress", "completed", "cancelled", "disputed"];
+const VALID_STATUSES = [
+  "open",
+  "in_progress",
+  "completed",
+  "cancelled",
+  "disputed",
+];
 
 const VALID_CATEGORIES = [
   "Smart Contracts",
@@ -134,7 +135,7 @@ function rowToJob(row) {
     title: row.title,
     description: row.description,
     budget: row.budget,
-    currency: row.currency || 'XLM',
+    currency: row.currency || "XLM",
     category: row.category,
     skills: row.skills,
     status: row.status,
@@ -148,12 +149,12 @@ function rowToJob(row) {
     deadline: row.deadline,
     timezone: row.timezone,
     screeningQuestions: row.screening_questions || [],
-    disputeReason:      row.dispute_reason,
+    disputeReason: row.dispute_reason,
     disputeDescription: row.dispute_description,
-    disputedBy:         row.disputed_by,
-    disputedAt:         row.disputed_at,
-    createdAt:         row.created_at,
-    updatedAt:         row.updated_at,
+    disputedBy: row.disputed_by,
+    disputedAt: row.disputed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -188,7 +189,18 @@ function rowToJob(row) {
  *   clientAddress: 'GBX...',
  * });
  */
-async function createJob({ title, description, budget, currency, category, skills, deadline, timezone, clientAddress, screeningQuestions }) {
+async function createJob({
+  title,
+  description,
+  budget,
+  currency,
+  category,
+  skills,
+  deadline,
+  timezone,
+  clientAddress,
+  screeningQuestions,
+}) {
   validatePublicKey(clientAddress);
 
   if (!title || title.length < 10) {
@@ -238,14 +250,14 @@ async function createJob({ title, description, budget, currency, category, skill
       title.trim(),
       description.trim(),
       parseFloat(budget).toFixed(7),
-      currency || 'XLM',
+      currency || "XLM",
       category,
       safeSkills,
       clientAddress,
       deadline || null,
       timezone || null,
-      safeScreeningQuestions
-    ]
+      safeScreeningQuestions,
+    ],
   );
 
   return rowToJob(rows[0]);
@@ -281,7 +293,7 @@ function encodeCursor(jobRow) {
     JSON.stringify({
       createdAt: jobRow.created_at,
       id: jobRow.id,
-    })
+    }),
   ).toString("base64");
 }
 
@@ -321,11 +333,18 @@ function decodeCursor(cursor) {
  * @returns {Promise<{jobs: Object[], nextCursor: string|null}>} An object containing the list of jobs and an optional next cursor for pagination.
  * @throws {Error} If the provided cursor is invalid.
  */
-async function listJobs({ category, status = "open", limit = 50, search, cursor, timezone } = {}) {
+async function listJobs({
+  category,
+  status = "open",
+  limit = 50,
+  search,
+  cursor,
+  timezone,
+} = {}) {
   const conditions = [];
   const params = [];
 
-  if (status && status !== 'all') {
+  if (status && status !== "all") {
     params.push(status);
     conditions.push(`status = $${params.length}`);
   } else if (!includeExpired) {
@@ -343,7 +362,7 @@ async function listJobs({ category, status = "open", limit = 50, search, cursor,
     conditions.push(
       `(LOWER(title) LIKE $${idx} OR LOWER(description) LIKE $${idx} OR EXISTS (
          SELECT 1 FROM unnest(skills) s WHERE LOWER(s) LIKE $${idx}
-       ))`
+       ))`,
     );
   }
 
@@ -356,7 +375,7 @@ async function listJobs({ category, status = "open", limit = 50, search, cursor,
         OR (visibility = 'invite_only' AND EXISTS (
           SELECT 1 FROM job_invitations ji
           WHERE ji.job_id = jobs.id AND ji.freelancer_address = $${viewerIdx}
-        )))`
+        )))`,
     );
   } else {
     conditions.push("visibility = 'public'");
@@ -368,7 +387,7 @@ async function listJobs({ category, status = "open", limit = 50, search, cursor,
     const createdAtIdx = params.length - 1;
     const idIdx = params.length;
     conditions.push(
-      `(created_at < $${createdAtIdx} OR (created_at = $${createdAtIdx} AND id < $${idIdx}))`
+      `(created_at < $${createdAtIdx} OR (created_at = $${createdAtIdx} AND id < $${idIdx}))`,
     );
   }
 
@@ -380,7 +399,7 @@ async function listJobs({ category, status = "open", limit = 50, search, cursor,
     `SELECT * FROM jobs ${where} ORDER BY
        CASE WHEN boosted = true AND (boosted_until IS NULL OR boosted_until > NOW()) THEN 0 ELSE 1 END,
        created_at DESC, id DESC LIMIT $${params.length}`,
-    params
+    params,
   );
 
   const jobs = rows.map(rowToJob);
@@ -404,7 +423,7 @@ async function listJobsByClient(clientAddress) {
   validatePublicKey(clientAddress);
   const { rows } = await pool.query(
     "SELECT * FROM jobs WHERE client_address = $1 ORDER BY created_at DESC",
-    [clientAddress]
+    [clientAddress],
   );
   return rows.map(rowToJob);
 }
@@ -426,7 +445,7 @@ async function updateJobStatus(id, status) {
 
   const { rows } = await pool.query(
     "UPDATE jobs SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
-    [status, id]
+    [status, id],
   );
 
   if (!rows.length) {
@@ -454,7 +473,7 @@ async function assignFreelancer(jobId, freelancerAddress) {
      SET freelancer_address = $1, status = 'in_progress', updated_at = NOW()
      WHERE id = $2
      RETURNING *`,
-    [freelancerAddress, jobId]
+    [freelancerAddress, jobId],
   );
 
   if (!rows.length) {
@@ -483,7 +502,7 @@ async function updateJobEscrowId(jobId, escrowContractId) {
 
   const { rows } = await pool.query(
     "UPDATE jobs SET escrow_contract_id = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
-    [escrowContractId, jobId]
+    [escrowContractId, jobId],
   );
 
   if (!rows.length) {
@@ -503,7 +522,9 @@ async function updateJobEscrowId(jobId, escrowContractId) {
  * @throws {Error} If the job is not found.
  */
 async function deleteJob(jobId) {
-  const { rowCount } = await pool.query("DELETE FROM jobs WHERE id = $1", [jobId]);
+  const { rowCount } = await pool.query("DELETE FROM jobs WHERE id = $1", [
+    jobId,
+  ]);
   if (!rowCount) {
     const e = new Error("Job not found");
     e.status = 404;
@@ -521,7 +542,9 @@ async function deleteJob(jobId) {
  */
 async function boostJob(jobId, txHash) {
   // Verify job exists
-  const { rows } = await pool.query("SELECT * FROM jobs WHERE id = $1", [jobId]);
+  const { rows } = await pool.query("SELECT * FROM jobs WHERE id = $1", [
+    jobId,
+  ]);
   if (!rows.length) {
     const e = new Error("Job not found");
     e.status = 404;
@@ -536,7 +559,7 @@ async function boostJob(jobId, txHash) {
      SET boosted = true, boosted_until = $1, updated_at = NOW()
      WHERE id = $2
      RETURNING *`,
-    [boostedUntil.toISOString(), jobId]
+    [boostedUntil.toISOString(), jobId],
   );
 
   return rowToJob(updateRows[0]);
@@ -552,7 +575,7 @@ async function boostJob(jobId, txHash) {
 async function incrementShareCount(jobId) {
   const { rows } = await pool.query(
     "UPDATE jobs SET share_count = COALESCE(share_count, 0) + 1, updated_at = NOW() WHERE id = $1 RETURNING *",
-    [jobId]
+    [jobId],
   );
 
   if (!rows.length) {
@@ -575,11 +598,13 @@ async function raiseDispute(jobId, { reason, description, raisedBy }) {
          updated_at = NOW() 
      WHERE id = $4 AND status = 'in_progress'
      RETURNING *`,
-    [reason, description, raisedBy, jobId]
+    [reason, description, raisedBy, jobId],
   );
 
   if (!rows.length) {
-    const e = new Error("Job not found or not in progress"); e.status = 404; throw e;
+    const e = new Error("Job not found or not in progress");
+    e.status = 404;
+    throw e;
   }
 
   return rowToJob(rows[0]);
@@ -596,11 +621,13 @@ async function resolveDispute(jobId) {
          updated_at = NOW() 
      WHERE id = $1 AND status = 'disputed'
      RETURNING *`,
-    [jobId]
+    [jobId],
   );
 
   if (!rows.length) {
-    const e = new Error("Job not found or not disputed"); e.status = 404; throw e;
+    const e = new Error("Job not found or not disputed");
+    e.status = 404;
+    throw e;
   }
 
   return rowToJob(rows[0]);
@@ -622,11 +649,15 @@ async function getCategoryAnalytics() {
   `);
 
   return rows.map((r) => ({
-    category:      r.category,
-    jobCount:      parseInt(r.job_count, 10),
-    avgBudgetXLM:  r.avg_budget_xlm ? parseFloat(parseFloat(r.avg_budget_xlm).toFixed(2)) : 0,
-    filledCount:   parseInt(r.filled_count, 10),
-    avgDaysToFill: r.avg_days_to_fill ? parseFloat(parseFloat(r.avg_days_to_fill).toFixed(1)) : null,
+    category: r.category,
+    jobCount: parseInt(r.job_count, 10),
+    avgBudgetXLM: r.avg_budget_xlm
+      ? parseFloat(parseFloat(r.avg_budget_xlm).toFixed(2))
+      : 0,
+    filledCount: parseInt(r.filled_count, 10),
+    avgDaysToFill: r.avg_days_to_fill
+      ? parseFloat(parseFloat(r.avg_days_to_fill).toFixed(1))
+      : null,
   }));
 }
 
@@ -647,13 +678,17 @@ async function getAnalyticsOverview() {
 
   const r = rows[0];
   return {
-    totalJobs:      parseInt(r.total_jobs, 10),
-    openJobs:       parseInt(r.open_jobs, 10),
+    totalJobs: parseInt(r.total_jobs, 10),
+    openJobs: parseInt(r.open_jobs, 10),
     inProgressJobs: parseInt(r.in_progress_jobs, 10),
-    completedJobs:  parseInt(r.completed_jobs, 10),
-    avgBudgetXLM:   r.avg_budget_xlm ? parseFloat(parseFloat(r.avg_budget_xlm).toFixed(2)) : 0,
-    totalFilled:    parseInt(r.total_filled, 10),
-    avgDaysToFill:  r.avg_days_to_fill ? parseFloat(parseFloat(r.avg_days_to_fill).toFixed(1)) : null,
+    completedJobs: parseInt(r.completed_jobs, 10),
+    avgBudgetXLM: r.avg_budget_xlm
+      ? parseFloat(parseFloat(r.avg_budget_xlm).toFixed(2))
+      : 0,
+    totalFilled: parseInt(r.total_filled, 10),
+    avgDaysToFill: r.avg_days_to_fill
+      ? parseFloat(parseFloat(r.avg_days_to_fill).toFixed(1))
+      : null,
   };
 }
 
