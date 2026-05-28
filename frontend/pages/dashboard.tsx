@@ -2,7 +2,7 @@
  * pages/dashboard.tsx
  * User dashboard — shows posted jobs, applications, and wallet balance.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import WalletConnect from "@/components/WalletConnect";
@@ -18,6 +18,9 @@ import {
   upsertPriceAlertPreference,
   fetchClientSpendingAnalytics,
   extendJobExpiry,
+  bulkCancelJobs,
+  bulkExtendJobs,
+  bulkBoostJobs,
 } from "@/lib/api";
 import {
   formatXLM,
@@ -40,6 +43,7 @@ import WithdrawToBankModal, {
 import { useToast } from "@/components/Toast";
 import clsx from "clsx";
 import JobAnalytics from "@/components/JobAnalytics";
+import BulkJobActionBar from "@/components/BulkJobActionBar";
 import ClientSpendingTab from "@/components/ClientSpendingTab";
 import { usePriceContext } from "@/contexts/PriceContext";
 import ProfileCompletenessWidget from "@/components/ProfileCompletenessWidget";
@@ -128,6 +132,89 @@ export default function Dashboard({ publicKey, onConnect }: DashboardProps) {
   const { success } = useToast();
   const { xlmPriceUsd } = usePriceContext();
   const { progress, checklistItems } = useOnboarding(publicKey);
+
+  // ── Bulk selection state ──────────────────────────────────────────────────
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  const toggleJobSelection = (jobId: string) => {
+    setSelectedJobIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) next.delete(jobId);
+      else next.add(jobId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const selectableIds = myJobs
+      .filter((j) => j.status === "open")
+      .map((j) => j.id);
+    if (selectableIds.every((id) => selectedJobIds.has(id))) {
+      setSelectedJobIds(new Set());
+    } else {
+      setSelectedJobIds(new Set(selectableIds));
+    }
+  };
+
+  const handleBulkCancel = async () => {
+    setBulkLoading(true);
+    try {
+      const res = await bulkCancelJobs(Array.from(selectedJobIds));
+      const cancelledIds = new Set(
+        res.results.filter((r) => r.success).map((r) => r.id),
+      );
+      setMyJobs((prev) =>
+        prev.map((j) =>
+          cancelledIds.has(j.id) ? { ...j, status: "cancelled" as const } : j,
+        ),
+      );
+      setSelectedJobIds(new Set());
+      return res;
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkExtend = async () => {
+    setBulkLoading(true);
+    try {
+      const res = await bulkExtendJobs(Array.from(selectedJobIds), 30);
+      setSelectedJobIds(new Set());
+      return res;
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkBoost = async () => {
+    setBulkLoading(true);
+    try {
+      const res = await bulkBoostJobs(
+        Array.from(selectedJobIds),
+        `bulk-boost-${Date.now()}`,
+      );
+      const boostedIds = new Set(
+        res.results.filter((r) => r.success).map((r) => r.id),
+      );
+      setMyJobs((prev) =>
+        prev.map((j) =>
+          boostedIds.has(j.id)
+            ? {
+                ...j,
+                boosted: true,
+                boostedUntil: res.results.find((r) => r.id === j.id)
+                  ?.boostedUntil,
+              }
+            : j,
+        ),
+      );
+      setSelectedJobIds(new Set());
+      return res;
+    } finally {
+      setBulkLoading(false);
+    }
+  };
 
   const isRepostable = (status: Job["status"]) => status === "cancelled";
   const alertMatches: Job[] = [];
@@ -781,6 +868,15 @@ export default function Dashboard({ publicKey, onConnect }: DashboardProps) {
           />
         )}
       </div>
+
+      <BulkJobActionBar
+        selectedCount={selectedJobIds.size}
+        onCancel={handleBulkCancel}
+        onExtend={handleBulkExtend}
+        onBoost={handleBulkBoost}
+        onClearSelection={() => setSelectedJobIds(new Set())}
+        loading={bulkLoading}
+      />
     </>
   );
 }

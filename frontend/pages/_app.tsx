@@ -27,7 +27,7 @@ const REF_STORAGE_KEY = "marketpay_pending_referrer";
 
 function App({ Component, pageProps }: AppProps) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
-  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);`n  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);`n  const [installDismissed, setInstallDismissed] = useState(false);
   const router = useRouter();
 
   // Capture ?ref= query param and persist it until the user connects a wallet
@@ -111,7 +111,7 @@ function App({ Component, pageProps }: AppProps) {
     }
   }, []);
 
-  const handleConnect = async () => {
+  useEffect(() => {`n    const onInstallPrompt = (event: any) => {`n      event.preventDefault();`n      setDeferredInstallPrompt(event);`n    };`n    window.addEventListener("beforeinstallprompt", onInstallPrompt);`n    return () => window.removeEventListener("beforeinstallprompt", onInstallPrompt);`n  }, []);`n`n  const handleInstallApp = async () => {`n    if (!deferredInstallPrompt) return;`n    deferredInstallPrompt.prompt();`n    const choice = await deferredInstallPrompt.userChoice;`n    if (choice?.outcome !== "accepted") setInstallDismissed(true);`n    setDeferredInstallPrompt(null);`n  };`n`n  const handleConnect = async () => {
     const { publicKey: pk, error } = await connectWallet();
     if (pk) {
       const authenticated = await handleAuthAndConnect(pk);
@@ -185,3 +185,4 @@ function App({ Component, pageProps }: AppProps) {
 }
 
 export default App;
+
