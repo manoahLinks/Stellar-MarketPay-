@@ -10,20 +10,10 @@ const { createRateLimiter } = require("../middleware/rateLimiter");
 
 const jobCreationRateLimiter = createRateLimiter(10, 1); // 10 job creations per minute
 const generalJobRateLimiter = createRateLimiter(30, 1); // 100 requests per minute for listing/getting jobs
+const suggestRateLimiter = createRateLimiter(60, 1); // 60 suggest requests per minute
 
 const jobService = require("../services/jobService");
-const {
-  createJob,
-  getJob,
-  listJobs,
-  listJobsByClient,
-  updateJobEscrowId,
-  deleteJob,
-  boostJob,
-  incrementShareCount,
-  raiseDispute,
-  resolveDispute,
-} = jobService.default || jobService;
+const { createJob, getJob, listJobs, listJobsByClient, updateJobEscrowId, deleteJob, boostJob, incrementShareCount, raiseDispute, resolveDispute, getRecommendedJobs, getSuggestions } = jobService.default || jobService;
 const { verifyJWT } = require("../middleware/auth");
 
 // Feed Helpers
@@ -705,6 +695,15 @@ router.get("/recommended", verifyJWT, async (req, res, next) => {
   } catch (e) {
     next(e);
   }
+});
+
+// GET /api/jobs/suggest — get job suggestions for autocomplete
+router.get("/suggest", suggestRateLimiter, async (req, res, next) => {
+  try {
+    const q = req.query.q || "";
+    const suggestions = await getSuggestions(q);
+    res.json({ success: true, data: suggestions });
+  } catch (e) { next(e); }
 });
 
 // GET /api/analytics/categories — stats per category

@@ -692,7 +692,42 @@ async function getAnalyticsOverview() {
   };
 }
 
-module.exports = {
+async function getSuggestions(query) {
+  if (!query || query.length < 2) {
+    return { titles: [], skills: [], categories: [] };
+  }
+
+  const q = query.trim();
+  const likePattern = `%${q}%`;
+
+  try {
+    const [titleResults, skillResults] = await Promise.all([
+      pool.query(
+        `SELECT DISTINCT title FROM jobs WHERE title ILIKE $1 AND status = 'open' ORDER BY title LIMIT 5`,
+        [likePattern]
+      ),
+      pool.query(
+        `SELECT DISTINCT skill FROM (SELECT unnest(skills) as skill FROM jobs WHERE status = 'open') skills WHERE skill ILIKE $1 ORDER BY skill LIMIT 3`,
+        [likePattern]
+      ),
+    ]);
+
+    const categoryMatches = VALID_CATEGORIES.filter((cat) =>
+      cat.toLowerCase().includes(q.toLowerCase())
+    ).slice(0, 2);
+
+    return {
+      titles: titleResults.rows.map((r) => r.title),
+      skills: skillResults.rows.map((r) => r.skill),
+      categories: categoryMatches,
+    };
+  } catch (err) {
+    console.error("Error fetching suggestions:", err);
+    return { titles: [], skills: [], categories: [] };
+  }
+}
+
+export default {
   createJob,
   getJob,
   listJobs,
@@ -707,257 +742,5 @@ module.exports = {
   resolveDispute,
   getCategoryAnalytics,
   getAnalyticsOverview,
-  bulkCancelJobs,
-  bulkExtendJobs,
-  bulkBoostJobs,
-};
-
-/**
- * Cancel multiple jobs at once. Only cancels jobs that are 'open' and belong
- * to the requesting client. Returns a per-job result array.
- *
- * @param {string[]} jobIds          Array of job UUIDs to cancel.
- * @param {string}   clientAddress   Stellar G-address of the requesting client.
- * @returns {Promise<Array<{id: string, success: boolean, error?: string}>>}
- */
-async function bulkCancelJobs(jobIds, clientAddress) {
-  validatePublicKey(clientAddress);
-
-  if (!Array.isArray(jobIds) || jobIds.length === 0) {
-    const e = new Error("jobIds must be a non-empty array");
-    e.status = 400;
-    throw e;
-  }
-  if (jobIds.length > 50) {
-    const e = new Error("Cannot bulk-cancel more than 50 jobs at once");
-    e.status = 400;
-    throw e;
-  }
-
-  // Fetch all requested jobs in one query
-  const { rows } = await pool.query(
-    `SELECT id, status, client_address FROM jobs WHERE id = ANY($1::uuid[])`,
-    [jobIds],
-  );
-
-  const found = new Map(rows.map((r) => [r.id, r]));
-  const results = [];
-
-  for (const id of jobIds) {
-    const job = found.get(id);
-    if (!job) {
-      results.push({ id, success: false, error: "Job not found" });
-      continue;
-    }
-    if (job.client_address !== clientAddress) {
-      results.push({ id, success: false, error: "Not your job" });
-      continue;
-    }
-    if (job.status !== "open") {
-      results.push({
-        id,
-        success: false,
-        error: `Cannot cancel a job with status '${job.status}'`,
-      });
-      continue;
-    }
-    results.push({ id, success: true });
-  }
-
-  // Batch-update only the eligible ones
-  const eligibleIds = results.filter((r) => r.success).map((r) => r.id);
-  if (eligibleIds.length > 0) {
-    await pool.query(
-      `UPDATE jobs SET status = 'cancelled', updated_at = NOW() WHERE id = ANY($1::uuid[])`,
-      [eligibleIds],
-    );
-  }
-
-  return results;
-}
-
-/**
- * Extend the expiry of multiple jobs at once. Only extends jobs that are
- * 'open' and belong to the requesting client.
- *
- * @param {string[]} jobIds          Array of job UUIDs to extend.
- * @param {string}   clientAddress   Stellar G-address of the requesting client.
- * @param {number}   [days=30]       Number of days to extend by (1–90).
- * @returns {Promise<Array<{id: string, success: boolean, newExpiresAt?: string, error?: string}>>}
- */
-async function bulkExtendJobs(jobIds, clientAddress, days = 30) {
-  validatePublicKey(clientAddress);
-
-  if (!Array.isArray(jobIds) || jobIds.length === 0) {
-    const e = new Error("jobIds must be a non-empty array");
-    e.status = 400;
-    throw e;
-  }
-  if (jobIds.length > 50) {
-    const e = new Error("Cannot bulk-extend more than 50 jobs at once");
-    e.status = 400;
-    throw e;
-  }
-  const safeDays = Math.max(1, Math.min(parseInt(days, 10) || 30, 90));
-
-  const { rows } = await pool.query(
-    `SELECT id, status, client_address, expires_at, extended_count FROM jobs WHERE id = ANY($1::uuid[])`,
-    [jobIds],
-  );
-
-  const found = new Map(rows.map((r) => [r.id, r]));
-  const results = [];
-
-  for (const id of jobIds) {
-    const job = found.get(id);
-    if (!job) {
-      results.push({ id, success: false, error: "Job not found" });
-      continue;
-    }
-    if (job.client_address !== clientAddress) {
-      results.push({ id, success: false, error: "Not your job" });
-      continue;
-    }
-    if (!["open", "in_progress"].includes(job.status)) {
-      results.push({
-        id,
-        success: false,
-        error: `Cannot extend a job with status '${job.status}'`,
-      });
-      continue;
-    }
-    if ((job.extended_count || 0) >= 3) {
-      results.push({
-        id,
-        success: false,
-        error: "Maximum extensions (3) reached",
-      });
-      continue;
-    }
-    results.push({ id, success: true });
-  }
-
-  // Batch-update eligible jobs
-  const eligibleIds = results.filter((r) => r.success).map((r) => r.id);
-  if (eligibleIds.length > 0) {
-    await pool.query(
-      `UPDATE jobs
-       SET
-         expires_at      = COALESCE(expires_at, NOW()) + ($1 || ' days')::interval,
-         extended_until  = COALESCE(expires_at, NOW()) + ($1 || ' days')::interval,
-         extended_count  = COALESCE(extended_count, 0) + 1,
-         updated_at      = NOW()
-       WHERE id = ANY($2::uuid[])`,
-      [safeDays, eligibleIds],
-    );
-
-    // Fetch updated expiry dates to return in results
-    const { rows: updated } = await pool.query(
-      `SELECT id, expires_at FROM jobs WHERE id = ANY($1::uuid[])`,
-      [eligibleIds],
-    );
-    const expiryMap = new Map(updated.map((r) => [r.id, r.expires_at]));
-    for (const r of results) {
-      if (r.success) r.newExpiresAt = expiryMap.get(r.id) || null;
-    }
-  }
-
-  return results;
-}
-
-/**
- * Boost multiple jobs at once. Only boosts jobs that are 'open' and belong
- * to the requesting client.
- *
- * @param {string[]} jobIds          Array of job UUIDs to boost.
- * @param {string}   clientAddress   Stellar G-address of the requesting client.
- * @param {string}   txHash          Payment transaction hash covering all boosts.
- * @returns {Promise<Array<{id: string, success: boolean, boostedUntil?: string, error?: string}>>}
- */
-async function bulkBoostJobs(jobIds, clientAddress, txHash) {
-  validatePublicKey(clientAddress);
-
-  if (!Array.isArray(jobIds) || jobIds.length === 0) {
-    const e = new Error("jobIds must be a non-empty array");
-    e.status = 400;
-    throw e;
-  }
-  if (jobIds.length > 20) {
-    const e = new Error("Cannot bulk-boost more than 20 jobs at once");
-    e.status = 400;
-    throw e;
-  }
-  if (!txHash || typeof txHash !== "string") {
-    const e = new Error("Transaction hash is required for bulk boost");
-    e.status = 400;
-    throw e;
-  }
-
-  const { rows } = await pool.query(
-    `SELECT id, status, client_address FROM jobs WHERE id = ANY($1::uuid[])`,
-    [jobIds],
-  );
-
-  const found = new Map(rows.map((r) => [r.id, r]));
-  const results = [];
-
-  for (const id of jobIds) {
-    const job = found.get(id);
-    if (!job) {
-      results.push({ id, success: false, error: "Job not found" });
-      continue;
-    }
-    if (job.client_address !== clientAddress) {
-      results.push({ id, success: false, error: "Not your job" });
-      continue;
-    }
-    if (job.status !== "open") {
-      results.push({
-        id,
-        success: false,
-        error: `Cannot boost a job with status '${job.status}'`,
-      });
-      continue;
-    }
-    results.push({ id, success: true });
-  }
-
-  const eligibleIds = results.filter((r) => r.success).map((r) => r.id);
-  if (eligibleIds.length > 0) {
-    const boostedUntil = new Date();
-    boostedUntil.setDate(boostedUntil.getDate() + 7);
-
-    await pool.query(
-      `UPDATE jobs
-       SET boosted = true, boosted_until = $1, updated_at = NOW()
-       WHERE id = ANY($2::uuid[])`,
-      [boostedUntil.toISOString(), eligibleIds],
-    );
-
-    for (const r of results) {
-      if (r.success) r.boostedUntil = boostedUntil.toISOString();
-    }
-  }
-
-  return results;
-}
-
-module.exports = {
-  createJob,
-  getJob,
-  listJobs,
-  listJobsByClient,
-  updateJobStatus,
-  assignFreelancer,
-  updateJobEscrowId,
-  deleteJob,
-  boostJob,
-  incrementShareCount,
-  raiseDispute,
-  resolveDispute,
-  getCategoryAnalytics,
-  getAnalyticsOverview,
-  bulkCancelJobs,
-  bulkExtendJobs,
-  bulkBoostJobs,
+  getSuggestions,
 };

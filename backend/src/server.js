@@ -198,6 +198,7 @@ app.use("/api/escrow",        escrowRoutes);
 app.use("/api/ratings",       ratingRoutes);
 app.use("/api/progress",      progressRoutes);
 app.use("/api/messages",      messageRoutes);
+app.use("/api/notifications", notificationRoutes);
 app.use("/api/webauthn",      webauthnRoutes);
 app.use("/api/disputes",      disputeRoutes);
 app.use("/api/admin/2fa",     admin2faRoutes);
