@@ -146,6 +146,14 @@ Decisions that shaped Stellar MarketPay's architecture:
 
 ---
 
+### Private Message Encryption
+
+**File**: [messaging-encryption.md](./messaging-encryption.md)
+
+**Purpose**: Documents the client-side encryption contract for private job messages and the nonce uniqueness requirement.
+
+---
+
 ## 🎯 Feature Documentation
 
 ### Transaction History Page

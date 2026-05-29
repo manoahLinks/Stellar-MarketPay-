@@ -13,7 +13,7 @@ This Soroban smart contract manages trustless escrow between clients and freelan
 | `refund_escrow(job_id, client)` | Client | Refund before work starts |
 | `get_escrow(job_id)` | Anyone | Read escrow record |
 | `get_status(job_id)` | Anyone | Read escrow status |
-| `upgrade(new_wasm_hash)` | Admin only | Upgrade contract WASM, bumps version |
+| `upgrade(new_wasm_hash)` | Admin only | Upgrade contract WASM, bumps version and preserves storage |
 | `get_version()` | Anyone | Return current contract version number |
 
 ## Build & Test
@@ -37,6 +37,9 @@ chmod +x ../../scripts/deploy-contract.sh
 
 Soroban upgrades replace only the executable WASM — all on-chain storage
 (escrows, proposals, ratings, …) is preserved automatically.
+
+The contract stores a `Version` value in state, so operators can confirm that
+the active WASM and the on-chain record are in sync after an upgrade.
 
 ### Step-by-step
 

@@ -13,6 +13,7 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const { WebSocketServer } = require("ws");
 const nodemailer = require("nodemailer");
+const promClient = require("prom-client");
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpecs = require('./config/swagger');
 const { logger, requestLoggerMiddleware, logError, createServiceLogger } = require('./utils/logger');
@@ -27,6 +28,7 @@ const authRoutes      = require("./routes/auth");
 const ratingRoutes    = require("./routes/ratings");
 const progressRoutes  = require("./routes/progress");
 const messageRoutes   = require("./routes/messageRoutes");
+const insightsRoutes  = require("./routes/insights");
 const webauthnRoutes  = require("./routes/webauthn");
 const disputeRoutes   = require("./routes/disputes");
 const adminRoutes     = require("./routes/admin");
@@ -47,6 +49,40 @@ const app  = express();
 const PORT = process.env.PORT || 4000;
 const server = http.createServer(app);
 const WS_OPEN = 1;
+
+const metricsRegistry = new promClient.Registry();
+promClient.collectDefaultMetrics({
+  register: metricsRegistry,
+  prefix: "marketpay_",
+});
+
+const httpRequestsTotal = new promClient.Counter({
+  name: "marketpay_http_requests_total",
+  help: "Total HTTP requests handled by the API",
+  labelNames: ["method", "route", "status_code"],
+  registers: [metricsRegistry],
+});
+
+const httpRequestDurationSeconds = new promClient.Histogram({
+  name: "marketpay_http_request_duration_seconds",
+  help: "HTTP request duration in seconds",
+  labelNames: ["method", "route", "status_code"],
+  buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 5],
+  registers: [metricsRegistry],
+});
+
+const dbConnectionGauge = new promClient.Gauge({
+  name: "marketpay_db_connections",
+  help: "Current PostgreSQL pool connection counts",
+  labelNames: ["state"],
+  registers: [metricsRegistry],
+});
+
+dbConnectionGauge.collect = function collectDbConnections() {
+  this.set({ state: "total" }, pool.totalCount);
+  this.set({ state: "idle" }, pool.idleCount);
+  this.set({ state: "waiting" }, pool.waitingCount);
+};
 
 const realtimeClients = new Set();
 const scopeSessionClients = new Map();
@@ -190,7 +226,43 @@ app.use(cors({
   credentials: true,
 }));
 
+app.use((req, res, next) => {
+  if (req.path === "/metrics") {
+    return next();
+  }
+
+  const endTimer = httpRequestDurationSeconds.startTimer();
+  res.on("finish", () => {
+    const routeLabel = req.route?.path
+      ? `${req.baseUrl || ""}${req.route.path}`
+      : req.path;
+    const statusCode = String(res.statusCode);
+
+    httpRequestsTotal.inc({
+      method: req.method,
+      route: routeLabel,
+      status_code: statusCode,
+    });
+    endTimer({
+      method: req.method,
+      route: routeLabel,
+      status_code: statusCode,
+    });
+  });
+
+  next();
+});
+
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 150, standardHeaders: true, legacyHeaders: false }));
+
+app.get("/metrics", async (req, res, next) => {
+  try {
+    res.set("Content-Type", metricsRegistry.contentType);
+    res.end(await metricsRegistry.metrics());
+  } catch (error) {
+    next(error);
+  }
+});
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use("/health",            healthRoutes);
@@ -202,6 +274,7 @@ app.use("/api/escrow",        escrowRoutes);
 app.use("/api/ratings",       ratingRoutes);
 app.use("/api/progress",      progressRoutes);
 app.use("/api/messages",      messageRoutes);
+app.use("/api/insights",      insightsRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/webauthn",      webauthnRoutes);
 app.use("/api/disputes",      disputeRoutes);
