@@ -61,7 +61,7 @@ function AttachmentLine({ cid, name, mime, senderNaclPub }: AttachmentLineProps)
       if (!res.ok) throw new Error(`IPFS fetch failed: ${res.status}`);
       const raw = new Uint8Array(await res.arrayBuffer());
       const plain = decryptFromSender(raw, senderNaclPub);
-      const blob = new Blob([plain]);
+      const blob = new Blob([plain as BlobPart]);
       const url = URL.createObjectURL(blob);
 
       if (isImage) {

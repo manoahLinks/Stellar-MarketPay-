@@ -28,6 +28,9 @@ import { usePriceContext } from "@/contexts/PriceContext";
 import ProfileCompletenessWidget from "@/components/ProfileCompletenessWidget";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import XlmPriceWidget from "@/components/XlmPriceWidget";
+import StateMessage from "@/components/StateMessage";
+import BuyXLMModal from "@/components/BuyXLMModal";
+import WithdrawToBankModal from "@/components/WithdrawToBankModal";
 
 // Dynamic imports for heavy components
 const JobAnalytics = dynamic(() => import("@/components/JobAnalytics"), {
@@ -119,6 +122,56 @@ export default function Dashboard({ publicKey, onConnect }: DashboardProps) {
   const latestJobApplicationsRef = useRef<Map<string, Application[]>>(new Map());
   const seenNotificationsRef = useRef<Set<string>>(new Set());
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [extendModalJob, setExtendModalJob] = useState<Job | null>(null);
+
+  const handleJobExtended = useCallback((updated: Job) => {
+    setMyJobs((prev) => prev.map((j) => (j.id === updated.id ? updated : j)));
+    setExtendModalJob(null);
+  }, []);
+
+  const handleBulkCancel = useCallback(async () => {
+    setBulkLoading(true);
+    try {
+      const ids = Array.from(selectedJobIds);
+      await Promise.all(ids.map((id) => fetch(`/api/jobs/${id}/cancel`, { method: "POST" })));
+      setSelectedJobIds(new Set());
+      return { success: ids.length, failed: 0 };
+    } catch {
+      return { success: 0, failed: selectedJobIds.size };
+    } finally {
+      setBulkLoading(false);
+    }
+  }, [selectedJobIds]);
+
+  const handleBulkExtend = useCallback(async () => {
+    setBulkLoading(true);
+    try {
+      const ids = Array.from(selectedJobIds);
+      await Promise.all(ids.map((id) => fetch(`/api/jobs/${id}/extend`, { method: "POST" })));
+      setSelectedJobIds(new Set());
+      return { success: ids.length, failed: 0 };
+    } catch {
+      return { success: 0, failed: selectedJobIds.size };
+    } finally {
+      setBulkLoading(false);
+    }
+  }, [selectedJobIds]);
+
+  const handleBulkBoost = useCallback(async () => {
+    setBulkLoading(true);
+    try {
+      const ids = Array.from(selectedJobIds);
+      await Promise.all(ids.map((id) => fetch(`/api/jobs/${id}/boost`, { method: "POST" })));
+      setSelectedJobIds(new Set());
+      return { success: ids.length, failed: 0 };
+    } catch {
+      return { success: 0, failed: selectedJobIds.size };
+    } finally {
+      setBulkLoading(false);
+    }
+  }, [selectedJobIds]);
 
   const handleCopy = async () => {
     if (!publicKey) return;
@@ -919,7 +972,7 @@ export default function Dashboard({ publicKey, onConnect }: DashboardProps) {
           onExtended={handleJobExtended}
         />
       )}
-    </>
+    </div>
   );
 }
 

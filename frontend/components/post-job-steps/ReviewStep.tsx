@@ -38,8 +38,8 @@ export default function ReviewStep({ form, isSubmitting, submitStep }: Props) {
 
       <div className="rounded-xl bg-amber-500/8 border border-amber-500/20 p-3">
         <p className="text-xs text-amber-700">
-          Clicking "Publish Job" will create a backend record and lock{" "}
-          <strong className="text-amber-300">{form.budget} {form.currency}</strong> in a Soroban escrow contract. You'll need to approve this in Freighter.
+          Clicking &quot;Publish Job&quot; will create a backend record and lock{" "}
+          <strong className="text-amber-300">{form.budget} {form.currency}</strong> in a Soroban escrow contract. You&apos;ll need to approve this in Freighter.
         </p>
       </div>
 

@@ -19,8 +19,6 @@ const {
   computeTiers,
   stroopsToXlm,
   getSafeGasEstimate,
-  CACHE_KEY,
-  CACHE_TTL,
 } = require("./gas_estimator");
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

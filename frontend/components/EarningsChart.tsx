@@ -154,7 +154,7 @@ export default function EarningsChart({ publicKey }: Props) {
               <YAxis tick={{ fill: "#a8956a", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}`} />
               <Tooltip
                 contentStyle={{ background: "#1a1610", border: "1px solid rgba(245,158,11,0.15)", borderRadius: 8, color: "#fef3c7", fontSize: 12 }}
-                formatter={(value: number) => [`${value.toFixed(2)} XLM`, "Earned"]}
+                formatter={(value) => [`${Number(value).toFixed(2)} XLM`, "Earned"]}
                 cursor={{ fill: "rgba(245,158,11,0.06)" }}
               />
               <Bar dataKey="total" fill="#f59e0b" radius={[4, 4, 0, 0]} />
@@ -185,7 +185,7 @@ export default function EarningsChart({ publicKey }: Props) {
                 </Pie>
                 <Tooltip
                   contentStyle={{ background: "#1a1610", border: "1px solid rgba(245,158,11,0.15)", borderRadius: 8, color: "#fef3c7", fontSize: 12 }}
-                  formatter={(value: number) => [`${value.toFixed(2)} XLM`]}
+                  formatter={(value) => [`${Number(value).toFixed(2)} XLM`]}
                 />
               </PieChart>
             </ResponsiveContainer>

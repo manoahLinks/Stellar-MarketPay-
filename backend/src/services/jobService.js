@@ -459,6 +459,13 @@ async function listJobs({
   includeExpired,
   viewerAddress,
   includeDeleted = false,
+  min_budget,
+  max_budget,
+  skills,
+  min_client_rating,
+  duration,
+  posted_since,
+  max_applications,
 } = {}) {
   const conditions = [];
   const params = [];

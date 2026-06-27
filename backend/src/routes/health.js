@@ -34,7 +34,6 @@ const ipfsService = require("../services/ipfsService");
 const router = express.Router();
 // Generous limit — probes hit this frequently
 const healthRateLimiter = createRateLimiter(120, 1);
-const subscribeRateLimiter = createRateLimiter(5, 1);
 
 const SERVER_START = Date.now();
 const VERSION = process.env.npm_package_version || "1.0.0";

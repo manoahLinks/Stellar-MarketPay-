@@ -1,11 +1,3 @@
-<<
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https:",
-].join('; ');
-
 import withPWAInit from "@ducanh2912/next-pwa";
 
 const withPWA = withPWAInit({
@@ -15,6 +7,12 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === "development",
 });
 
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https:",
+].join('; ');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -36,27 +34,9 @@ const nextConfig = {
       { protocol: 'https', hostname: 'w3s.link' },
     ],
   },
-
-  async headers() {
-    return [
-      {
-        source: "/:path*",
-        headers: [
-          {
-            key: "Content-Security-Policy",
-            value: contentSecurityPolicy,
-          },
-        ],
-      },
-    ];
-  },
-  webpack: (config) => {
-
   webpack: (config, { isServer }) => {
-
     config.resolve.fallback = { ...config.resolve.fallback, fs: false, net: false, tls: false };
-    
-    // Bundle analyzer configuration
+
     if (process.env.ANALYZE === 'true') {
       const { BundleAnalyzerPlugin } = require('@next/bundle-analyzer')({
         openAnalyzer: false,
@@ -70,33 +50,30 @@ const nextConfig = {
         })
       );
     }
-    
+
     return config;
   },
   env: {
     SKIP_API_CALLS: process.env.SKIP_API_CALLS || "false",
   },
-  // HTTP/2 Server Push headers for critical assets
   async headers() {
     return [
-      // Preload critical assets
       {
-        source: '/:path*',
+        source: "/:path*",
         headers: [
+          { key: "Content-Security-Policy", value: contentSecurityPolicy },
           {
             key: 'Link',
             value: '</_next/static/css/app/layout.css>; rel=preload; as=style, </_next/static/chunks/webpack.js>; rel=preload; as=script, </_next/static/chunks/framework.js>; rel=preload; as=script',
           },
         ],
       },
-      // Cache static assets with long TTL
       {
         source: '/_next/static/:path*',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
-      // Cache profile images with shorter TTL
       {
         source: '/profile/:path*',
         headers: [
@@ -105,9 +82,8 @@ const nextConfig = {
       },
     ];
   },
-  // Optimize bundle splitting
   swcMinify: true,
-  // Enable compression
   compress: true,
 };
+
 export default withPWA(nextConfig);

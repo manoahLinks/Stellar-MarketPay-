@@ -71,7 +71,7 @@ async function executeWithRetry(fn, method) {
   let attempt = 0;
   let delay = _retryBaseDelayMs;
 
-  while (true) {
+  for (;;) {
     try {
       const result = await fn();
       endTimer({ status: "success" });

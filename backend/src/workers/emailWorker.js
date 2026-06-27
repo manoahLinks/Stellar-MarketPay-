@@ -9,7 +9,7 @@ const { createServiceLogger, logError } = require("../utils/logger");
 const emailLogger = createServiceLogger('email-worker');
 
 emailQueue.process(5, async (job) => {
-  const { recipientAddress, eventType, jobId, payload, notificationId } = job.data;
+  const { recipientAddress, eventType, payload, notificationId } = job.data;
   
   try {
     const prefs = await getUserPreferences(recipientAddress);

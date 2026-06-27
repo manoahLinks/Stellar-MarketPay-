@@ -224,11 +224,11 @@ export default function StatusPage() {
               Get status alerts
             </h2>
             <p className="text-sm text-market-400 mb-4">
-              We'll email you when a service goes down or recovers.
+              We&apos;ll email you when a service goes down or recovers.
             </p>
 
             {subState === "done" ? (
-              <p className="text-emerald-400 text-sm">You're subscribed!</p>
+              <p className="text-emerald-400 text-sm">You&apos;re subscribed!</p>
             ) : (
               <form onSubmit={handleSubscribe} className="flex gap-3 flex-wrap">
                 <input

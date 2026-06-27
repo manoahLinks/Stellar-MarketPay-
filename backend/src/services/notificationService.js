@@ -7,6 +7,7 @@
 const pool = require("../db/pool");
 const axios = require("axios");
 const { createServiceLogger } = require("../utils/logger");
+const { emailQueue } = require("../utils/queue");
 
 const MAX_RETRIES = 5;
 
