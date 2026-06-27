@@ -94,10 +94,6 @@ api.interceptors.request.use(async (config: any) => {
   if (!config.skipAuthRefresh && shouldRefreshToken()) {
     await refreshAccessToken();
   }
-
-  if (jwtToken) {
-    config.headers.Authorization = `Bearer ${jwtToken}`;
-  }
   return config;
 });
 
@@ -113,8 +109,6 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       const token = await refreshAccessToken();
       if (token) {
-        originalRequest.headers = originalRequest.headers || {};
-        originalRequest.headers.Authorization = `Bearer ${token}`;
         return api(originalRequest);
       }
     }

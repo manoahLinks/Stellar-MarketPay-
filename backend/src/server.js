@@ -23,11 +23,7 @@ const { sanitizeMiddleware } = require('./middleware/sanitize');
 const { getRateLimitScale } = require("./middleware/rateLimiter");
 const { requireChoice } = require("./config/env");
 const { createCorsOptions } = require("./config/cors");
-const { verifyJWT, requireAdminRole } = require("./middleware/auth");
-const { ExpressAdapter } = require('@bull-board/express');
-const { createBullBoard } = require('@bull-board/api');
-const { BullAdapter } = require('@bull-board/api/bullAdapter');
-const { emailQueue } = require('./utils/queue');
+const { verifyCSRF } = require("./middleware/csrf");
 
 const jobRoutes       = require("./routes/jobs");
 const applicationRoutes = require("./routes/applications");
@@ -238,6 +234,7 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
 }));
 
 app.use(cors(createCorsOptions({ logger: serviceLogger })));
+app.use(verifyCSRF);
 
 app.use((req, res, next) => {
   if (req.path === "/metrics") {
