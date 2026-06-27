@@ -1,4 +1,4 @@
-import { Html, Head, Main, NextScript } from "next/document";
+import Document, { Html, Head, Main, NextScript, DocumentContext, DocumentInitialProps } from "next/document";
 
 // Inline script applied before hydration to prevent flash of wrong theme.
 // Must remain synchronous and inline — do NOT move to next/script.
@@ -13,36 +13,31 @@ const themeScript = `
 })();
 `;
 
-export default function Document() {
+type MarketPayDocumentProps = DocumentInitialProps & {
+  nonce?: string;
+};
+
+export default function MarketPayDocument({ nonce }: MarketPayDocumentProps) {
   return (
     <Html lang="en">
-      <Head>
-        {/*
-         * Theme detection must run synchronously before paint to avoid FOUC.
-         * All other scripts should use <Script strategy="lazyOnload"> in _app.tsx.
-         */}
-        <link
-          rel="preconnect"
-          href="https://fonts.googleapis.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-          integrity="sha256-gG/REws4rK1dFJcjBtLvVPYoLvhP7D2yRepUOOFbcKY="
-          crossOrigin="anonymous"
-        />
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      <Head nonce={nonce}>
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
       </Head>
       <body>
         <Main />
-        <NextScript />
+        <NextScript nonce={nonce} />
       </body>
     </Html>
   );
 }
+
+MarketPayDocument.getInitialProps = async (ctx: DocumentContext): Promise<MarketPayDocumentProps> => {
+  const initialProps = await Document.getInitialProps(ctx);
+  const nonceHeader = ctx.req?.headers["x-nonce"];
+  const nonce = Array.isArray(nonceHeader) ? nonceHeader[0] : nonceHeader;
+
+  return {
+    ...initialProps,
+    nonce,
+  };
+};

@@ -1,3 +1,11 @@
+
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https:",
+].join('; ');
+
 import withPWAInit from "@ducanh2912/next-pwa";
 
 const withPWA = withPWAInit({
@@ -6,6 +14,7 @@ const withPWA = withPWAInit({
   sw: "sw.js",
   disable: process.env.NODE_ENV === "development",
 });
+
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -27,7 +36,24 @@ const nextConfig = {
       { protocol: 'https', hostname: 'w3s.link' },
     ],
   },
+
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: contentSecurityPolicy,
+          },
+        ],
+      },
+    ];
+  },
+  webpack: (config) => {
+
   webpack: (config, { isServer }) => {
+
     config.resolve.fallback = { ...config.resolve.fallback, fs: false, net: false, tls: false };
     
     // Bundle analyzer configuration
