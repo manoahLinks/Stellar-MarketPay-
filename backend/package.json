@@ -7,9 +7,9 @@
         "dev": "nodemon src/server.js",
         "start": "node src/server.js",
         "lint": "eslint src/**/*.js",
-        "test": "jest --coverage --forceExit",
-        "test:unit": "jest --forceExit",
-        "test:migrations": "jest src/db/migrations.test.js --forceExit",
+        "test": "jest --coverage",
+        "test:unit": "jest",
+        "test:mutation": "stryker run",
         "generate-openapi": "node scripts/generate-openapi.js",
         "build": "npm run generate-openapi && npm run lint",
         "migrate": "node src/db/migrate.js",
@@ -51,8 +51,8 @@
         "ws": "^8.20.0"
     },
     "devDependencies": {
-        "ajv": "^8.20.0",
-        "ajv-formats": "^3.0.1",
+        "@stryker-mutator/core": "^9.6.1",
+        "@stryker-mutator/jest-runner": "^9.6.1",
         "eslint": "^8.57.0",
         "jest": "^30.3.0",
         "nodemailer-mock": "^2.0.13",
