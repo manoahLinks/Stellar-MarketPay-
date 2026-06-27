@@ -510,6 +510,15 @@ async function bootstrap() {
   startWsEventCleanup();
   startWeeklyDigestScheduler();
 
+  if (process.env.NODE_ENV !== "test") {
+    server.listen(PORT, () => {
+      serviceLogger.info({
+        port: PORT,
+        network: STELLAR_NETWORK,
+        nodeEnv: process.env.NODE_ENV || "development",
+      }, 'Stellar MarketPay API server started');
+    });
+  }
   // Start platform metrics aggregator - runs hourly for Issue #561
   startPlatformMetricsAggregator();
 
